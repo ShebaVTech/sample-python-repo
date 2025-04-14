@@ -1,4 +1,4 @@
-name: Track Merges into Beta (Linked PR Titles) # Updated name for clarity
+name: Track Merges into Beta (Linked PR Titles)
 
 on:
   pull_request:
@@ -20,7 +20,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Optional: You can remove this verification step if you are confident checkout works
       - name: Verify Workspace and Git Directory
         run: |
           echo "--- Verifying Checkout ---"
@@ -33,42 +32,38 @@ jobs:
         id: get_prs
         run: |
           echo "Attempting gh pr list command..."
-          # Fetch both title and url again to create links
           RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
 
-          # Use jq to format each PR as a Markdown link: [title](url)
-          # Note the quotes within the jq string to create the markdown
           FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
 
-          # Check if any PRs were found
           if [ -z "$FORMATTED_PRS" ]; then
             echo "No merged PRs found to report."
             FORMATTED_PRS=""
           else
             echo "Formatted PR Links:"
-            echo "$FORMATTED_PRS" # Output will be lines of [title](url)
+            echo "$FORMATTED_PRS"
           fi
 
-          # Store the formatted markdown links in the GITHUB_ENV
           echo "PRS<<EOF" >> $GITHUB_ENV
           echo "$FORMATTED_PRS" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Create an Issue with the list of PR Links
-        # Only run this step if the PRS variable is not empty
         if: env.PRS != ''
         run: |
           ISSUE_TITLE="PRs Merged into Beta"
-          # Construct the body string ensuring newlines are preserved correctly BEFORE piping
-          # Using printf for the body construction part
-          ISSUE_BODY=$(printf "Merged PRs:\n\n%s" "${PRS}")
+
+          # Define QA assignees and mentions
+          QA_USERS="DB"
+          QA_MENTIONS="@ShebaVTech"
+
+          # Construct issue body with mentions and PR links
+          ISSUE_BODY=$(printf "Hey %s,\n\nThe following PRs have been merged into **beta** and are ready for QA:\n\n%s" "$QA_MENTIONS" "${PRS}")
 
           echo "Creating issue with title: $ISSUE_TITLE"
-          # Log the body exactly as it will be passed to gh issue create
           echo "--- Issue Body Start ---"
           echo "${ISSUE_BODY}"
           echo "--- Issue Body End ---"
 
-          # Pipe the body content via stdin to gh issue create using --body-file -
-          # This handles newlines and special characters more reliably
-          printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - -R ${{ github.repository }}
+          # Create the GitHub issue with assignees and body content
+          printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - --assignee "$QA_USERS" -R ${{ github.repository }}
