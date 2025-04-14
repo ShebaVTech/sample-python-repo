@@ -54,8 +54,8 @@ jobs:
           ISSUE_TITLE="PRs Merged into Beta"
 
           # Define QA assignees and mentions
-          QA_USERS="JaneDoe,JohnSmith"
-          QA_MENTIONS="@JaneDoe @JohnSmith"
+          QA_USERS="ShebaVTech"
+          QA_MENTIONS="@ShebaVTech"
 
           # Get current date/time (only date, hour, and minute)
           CURRENT_TIME=$(date +"%Y-%m-%d %H:%M")
