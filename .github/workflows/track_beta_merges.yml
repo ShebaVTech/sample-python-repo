@@ -53,17 +53,19 @@ jobs:
         run: |
           ISSUE_TITLE="PRs Merged into Beta"
 
-          # Define QA assignees and mentions
-          QA_USERS="DB"
-          QA_MENTIONS="@ShebaVTech"
+          # Define QA users (GitHub usernames) to assign
+          QA_USERS="ShebaVTech"
 
-          # Construct issue body with mentions and PR links
-          ISSUE_BODY=$(printf "Hey %s,\n\nThe following PRs have been merged into **beta** and are ready for QA:\n\n%s" "$QA_MENTIONS" "${PRS}")
+          # Get current date and time
+          CURRENT_TIME=$(date +"%Y-%m-%d %H:%M:%S %Z")
+
+          # Construct a clean issue body (no @mentions)
+          ISSUE_BODY=$(printf "The following PRs have been merged on **%s** into the **beta** branch and are ready for QA:\n\n%s" "$CURRENT_TIME" "${PRS}")
 
           echo "Creating issue with title: $ISSUE_TITLE"
           echo "--- Issue Body Start ---"
           echo "${ISSUE_BODY}"
           echo "--- Issue Body End ---"
 
-          # Create the GitHub issue with assignees and body content
+          # Create the GitHub issue and assign QA users (no mentions in body)
           printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - --assignee "$QA_USERS" -R ${{ github.repository }}
