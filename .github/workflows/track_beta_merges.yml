@@ -61,7 +61,7 @@ jobs:
           CURRENT_TIME=$(date +"%Y-%m-%d %H:%M")
 
           # Construct issue body with mentions and PR links
-          ISSUE_BODY=$(printf "Hey %s,\n\nThe following PRs have been merged on **%s** into **beta** and are ready for QA:\n\n%s" "$QA_MENTIONS" "$CURRENT_TIME" "${PRS}")
+          ISSUE_BODY=$(printf "PRs ready for QA updated with a new merge on **%s**:\n\n%s" "$CURRENT_TIME" "${PRS}")
 
           echo "Creating issue with title: $ISSUE_TITLE"
           echo "--- Issue Body Start ---"
