@@ -1,2 +1,2 @@
-print('Move Code to main!')
+print('Move Code to main and test!')
 
