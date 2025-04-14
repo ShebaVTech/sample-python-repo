@@ -1,13 +1,19 @@
 name: Track Merges into Beta (Linked PR Titles)
 
 on:
-  push:
+  pull_request:
+    types:
+      - closed
     branches:
       - beta
 
 jobs:
   track_prs:
+    # Only run if this was a PR merge event (not just a close)
+    if: github.event.pull_request.merged == true
+
     runs-on: ubuntu-latest
+
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -27,8 +33,8 @@ jobs:
         id: get_prs
         run: |
           echo "Fetching recently merged PRs into beta..."
-          RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
 
+          RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
           FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
 
           if [ -z "$FORMATTED_PRS" ]; then
@@ -64,4 +70,3 @@ jobs:
           echo "--- Issue Body End ---"
 
           printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - --assignee "$QA_USERS" -R ${{ github.repository }}
-
