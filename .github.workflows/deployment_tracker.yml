@@ -1,0 +1,67 @@
+name: Track Merges into Beta (Linked PR Titles)
+
+on:
+  push:
+    branches:
+      - beta
+
+jobs:
+  track_prs:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Workspace and Git Directory
+        run: |
+          echo "--- Verifying Checkout ---"
+          echo "Current directory: $(pwd)"
+          ls -la ${{ github.workspace }}
+          if [ -d "${{ github.workspace }}/.git" ]; then echo ".git directory FOUND."; else echo ".git directory NOT FOUND."; fi
+          echo "--- End Verification ---"
+
+      - name: Get merged PRs into beta and format as Markdown links
+        id: get_prs
+        run: |
+          echo "Fetching recently merged PRs into beta..."
+          RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
+
+          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
+
+          if [ -z "$FORMATTED_PRS" ]; then
+            echo "No merged PRs found to report."
+            echo "PRS=" >> $GITHUB_ENV
+          else
+            echo "Formatted PR Links:"
+            echo "$FORMATTED_PRS"
+
+            echo "PRS<<EOF" >> $GITHUB_ENV
+            echo "$FORMATTED_PRS" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
+
+      - name: Create an Issue with the list of PR Links
+        if: env.PRS != ''
+        run: |
+          ISSUE_TITLE="PRs Merged into Beta"
+
+          # Define QA assignees and mentions
+          QA_USERS="ShebaVTech"
+          QA_MENTIONS="@ShebaVTech"
+
+          # Get current date/time
+          CURRENT_TIME=$(date +"%Y-%m-%d %H:%M")
+
+          # Construct issue body
+          ISSUE_BODY=$(printf "PRs ready for QA updated with a new merge on **%s**:\n\n%s" "$CURRENT_TIME" "${PRS}")
+
+          echo "Creating issue with title: $ISSUE_TITLE"
+          echo "--- Issue Body Start ---"
+          echo "${ISSUE_BODY}"
+          echo "--- Issue Body End ---"
+
+          printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - --assignee "$QA_USERS" -R ${{ github.repository }}
+
