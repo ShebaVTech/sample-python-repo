@@ -1,3 +1,3 @@
-print('didn't get notification')
+print('no @qa_team')
 
 
