@@ -1,4 +1,4 @@
-name: Track Merges into beta (Linked PR Titles)
+name: Track Merges into Beta (Linked PR Titles)
 
 on:
   pull_request:
@@ -14,10 +14,8 @@ permissions:
 
 jobs:
   track_prs:
-    # Only run if the PR was actually merged
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -25,59 +23,51 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Optional: Verify the workspace and directory
-      - name: Verify Workspace and Git Directory
+      - name: Verify .git and workspace
         run: |
-          echo "--- Verifying Checkout ---"
-          echo "Current directory: $(pwd)"
-          ls -la ${{ github.workspace }}
-          if [ -d "${{ github.workspace }}/.git" ]; then echo ".git directory FOUND."; else echo ".git directory NOT FOUND."; fi
-          echo "--- End Verification ---"
+          echo "Workspace: $(pwd)"
+          ls -la
+          if [ -d ".git" ]; then echo ".git found"; else echo ".git not found"; fi
 
       - name: Get merged PRs into beta and format as Markdown links
         id: get_prs
         run: |
-          echo "Attempting gh pr list command..."
-          # Fetch both title and URL again to create links
+          echo "Getting merged PRs..."
           RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
-
-          # Use jq to format each PR as a Markdown link: [title](url)
-          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
-
-          # Check if any PRs were found
+          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "- [\(.title)](\(.url))"')
+          
           if [ -z "$FORMATTED_PRS" ]; then
-            echo "No merged PRs found to report."
-            FORMATTED_PRS=""
+            echo "No merged PRs found."
+            echo "PRS=" >> $GITHUB_ENV
           else
-            echo "Formatted PR Links:"
+            echo "Merged PRs found:"
             echo "$FORMATTED_PRS"
+            echo "PRS<<EOF" >> $GITHUB_ENV
+            echo "$FORMATTED_PRS" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           fi
 
-          # Store the formatted markdown links in the GITHUB_ENV
-          echo "PRS<<EOF" >> $GITHUB_ENV
-          echo "$FORMATTED_PRS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+      - name: Load QA member usernames
+        id: load_qa
+        run: |
+          FILE=".github/workflows/qa_members.txt"
+          if [ ! -f "$FILE" ]; then
+            echo "QA member list not found: $FILE"
+            echo "MENTIONS=" >> $GITHUB_ENV
+          else
+            MENTIONS=$(grep -v '^#' "$FILE" | sed '/^$/d' | sed 's/^/@/' | paste -sd ' ' -)
+            echo "MENTIONS=$MENTIONS" >> $GITHUB_ENV
+          fi
 
-      - name: Create an Issue with the list of PR Links
+      - name: Create GitHub Issue for QA
         if: env.PRS != ''
         run: |
-          ISSUE_TITLE="PRs Merged into beta"
-          ISSUE_BODY=$(printf "Merged PRs:\n\n%s" "${PRS}")
-          echo "Creating issue with title: $ISSUE_TITLE"
+          ISSUE_TITLE="PRs Merged into Beta"
+          ISSUE_BODY=$(printf "The following PRs have been merged into **beta**:\n\n%s\n\nPlease begin QA testing on the listed PRs.\n\nCC: %s" "${PRS}" "${MENTIONS}")
+          
+          echo "Creating issue with body:"
+          echo "-----------------------------"
+          echo "$ISSUE_BODY"
+          echo "-----------------------------"
+
           printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - -R ${{ github.repository }}
-          echo "Created issue: $ISSUE_TITLE"
-
-      - name: Notify QA Team from qa_members.txt
-        if: steps.create_issue.outputs.issue_url != ''
-        run: |
-          ISSUE_URL="${{ steps.create_issue.outputs.issue_url }}"
-          ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+')
-          
-          # Read the list of QA members from qa_members.txt
-          QA_MEMBERS=$(cat .github/workflows/qa_members.txt)
-
-          # Add a comment mentioning all QA members
-          COMMENT_BODY="@${QA_MEMBERS} This PR merge to beta requires QA testing. Please review the changes listed in this issue and prioritize testing for the upcoming release."
-          
-          # Add the comment
-          gh issue comment "$ISSUE_NUMBER" --body "$COMMENT_BODY" -R ${{ github.repository }}
