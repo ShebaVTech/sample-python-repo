@@ -1,3 +1,3 @@
-print('Losing Patie')
+print('Losing Patien')
 
 
