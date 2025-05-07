@@ -30,38 +30,7 @@ jobs:
       - name: Get merged PRs into beta
         id: get_prs
         run: |
-          RAW_PRS=$(gh pr list --base beta --state merged --json title -L 100 -R ${{ github.repository }})
-          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "  - PR-\(.title)"')
-
-          if [ -z "$FORMATTED_PRS" ]; then
-            echo "PRS=" >> $GITHUB_ENV
-          else
-            echo "PRS<<EOF" >> $GITHUB_ENV
-            echo "$FORMATTED_PRS" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
-          fi
-
-      - name: Load QA member usernames
-        id: load_qa
-        run: |
-          FILE=".github/workflows/qa_members.txt"
-          if [ ! -f "$FILE" ]; then
-            echo "QA member list not found: $FILE"
-            echo "MENTIONS=" >> $GITHUB_ENV
-          else
-            MENTIONS=$(grep -v '^#' "$FILE" | sed '/^$/d' | sed 's/^/@/' | paste -sd ' ' -)
-            echo "MENTIONS=$MENTIONS" >> $GITHUB_ENV
-          fi
-
-      - name: Create GitHub Issue for QA
-        if: env.PRS != ''
-        run: |
-          TITLE="PRs Merged into Beta - ${today}"
-
-          # Construct the message body
-          BODY="Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n${PRS}\n\n${MENTIONS} Please begin QA testing on the listed PRs."
-
-          echo "$BODY"
-
-          # Create the GitHub issue with the formatted body
-          echo "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}
+          RAW_PRS=$(gh pr list --base beta --state merged --json number,title,mergedAt -L 100 -R ${{ github.repository }})
+          TODAY=$(date +'%Y-%m-%d')
+          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r --arg TODAY "$TODAY" '
+            m
