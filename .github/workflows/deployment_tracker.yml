@@ -31,7 +31,7 @@ jobs:
         id: get_prs
         run: |
           RAW_PRS=$(gh pr list --base beta --state merged --json title -L 100 -R ${{ github.repository }})
-          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "  - \(.title)"')
+          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "  - PR-\(.title)"')
 
           if [ -z "$FORMATTED_PRS" ]; then
             echo "PRS=" >> $GITHUB_ENV
@@ -57,6 +57,7 @@ jobs:
         if: env.PRS != ''
         run: |
           TITLE="PRs Merged into Beta - ${today}"
-          BODY=$(printf "Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n\n%s\n\n" "${MENTIONS}\n\n${PRS}")
+          BODY=$(printf "Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n%s\n\n" "${MENTIONS}\n\n${PRS}")
 
+          # Ensure proper line breaks and format
           printf "%s" "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}
