@@ -1,3 +1,3 @@
-print('Losing P')
+print('Losing Pa')
 
 
