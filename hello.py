@@ -1,3 +1,3 @@
-print('no @qa_team')
+print('no @')
 
 
