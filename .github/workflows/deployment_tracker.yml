@@ -2,8 +2,7 @@ name: Notify QAs of Merged PRs to Beta
 
 on:
   pull_request:
-    types:
-      - closed
+    types: [closed]
     branches:
       - beta
   workflow_dispatch:
@@ -14,7 +13,7 @@ permissions:
 
 jobs:
   notify_qas:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'beta' && github.event.pull_request.head.ref == 'main'
     runs-on: ubuntu-latest
 
     env:
@@ -31,20 +30,20 @@ jobs:
       - name: Load QA members from file
         id: load_qas
         run: |
-          if [ ! -f .github/workflows/qa_members.txt ]; then
-            echo "QA members file not found."
+          FILE=".github/workflows/qa_members.txt"
+          if [ ! -f "$FILE" ]; then
+            echo "QA members file not found: $FILE"
             exit 1
           fi
 
-          QAS=$(cat .github/workflows/qa_members.txt | grep -v '^#' | tr '\n' ' ')
+          QAS=$(cat "$FILE" | grep -v '^#' | tr '\n' ' ')
           echo "MENTIONS=${QAS}" >> $GITHUB_ENV
 
       - name: Get recent merged PRs into beta
         id: get_prs
         run: |
-          RAW_PRS=$(gh pr list --base beta --state merged --json number,title -L 100 -R ${{ github.repository }})
-          
-          # Filter for PRs merged today
+          RAW_PRS=$(gh pr list --base beta --state merged --json number,title,mergedAt -L 100 -R ${{ github.repository }})
+
           TODAY=$(date +%Y-%m-%d)
           PRS=$(echo "$RAW_PRS" | jq -r --arg TODAY "$TODAY" '
             map(select(.mergedAt | startswith($TODAY))) |
@@ -68,11 +67,11 @@ jobs:
           TITLE="PRs Merged into Beta - ${today}"
 
           cat <<EOF > issue_body.md
+${MENTIONS} Please begin QA testing on the listed PRs.
+
 The following PRs have been merged into beta:
 
 ${PRS}
-
-${MENTIONS} Please begin QA testing on the listed PRs.
 EOF
 
           echo "Final Issue Body:"
