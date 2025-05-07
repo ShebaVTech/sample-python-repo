@@ -1,2 +1,2 @@
-print('edit test notification!')
+print('notify qas!')
 
