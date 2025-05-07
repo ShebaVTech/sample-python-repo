@@ -1,11 +1,11 @@
-name: Track Merges into beta (Linked PR Titles)
+name: Track Merges into beta-release (Linked PR Titles)
 
 on:
   pull_request:
     types:
       - closed
     branches:
-      - beta
+      - beta-release
   workflow_dispatch:
 
 permissions:
@@ -16,10 +16,8 @@ jobs:
   track_prs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,11 +30,11 @@ jobs:
           if [ -d "${{ github.workspace }}/.git" ]; then echo ".git directory FOUND."; else echo ".git directory NOT FOUND."; fi
           echo "--- End Verification ---"
 
-      - name: Get merged PRs into beta and format as Markdown links
+      - name: Get merged PRs into beta-release and format as Markdown links
         id: get_prs
         run: |
           echo "Attempting gh pr list command..."
-          RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
+          RAW_PRS=$(gh pr list --base beta-release --state merged --json title,url -L 100 -R ${{ github.repository }})
           FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
 
           if [ -z "$FORMATTED_PRS" ]; then
@@ -55,28 +53,39 @@ jobs:
         if: env.PRS != ''
         id: create_issue
         run: |
-          ISSUE_TITLE="PRs Merged into beta"
+          ISSUE_TITLE="PRs Merged into beta-release"
           ISSUE_BODY=$(printf "Merged PRs:\n\n%s" "${PRS}")
+
+          echo "Creating issue with title: $ISSUE_TITLE"
           echo "--- Issue Body Start ---"
           echo "${ISSUE_BODY}"
           echo "--- Issue Body End ---"
 
-          ISSUE_URL=$(printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - -R ${{ github.repository }} --json url -q .url)
-          echo "issue_url=${ISSUE_URL}" >> $GITHUB_OUTPUT
-          echo "Created issue: ${ISSUE_URL}"
+          printf "%s" "${ISSUE_BODY}" | gh issue create --title "$ISSUE_TITLE" --body-file - -R ${{ github.repository }}
 
-      - name: Notify QA Members Listed in .github/qa-members.txt
-        if: steps.create_issue.outputs.issue_url != ''
+      - name: Get Created Issue Number
+        id: get_issue_number
         run: |
-          ISSUE_URL="${{ steps.create_issue.outputs.issue_url }}"
-          ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+          echo "Getting latest issue number..."
+          ISSUE_NUMBER=$(gh issue list --limit 1 --state open --json number --jq '.[0].number' -R ${{ github.repository }})
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
+          echo "issue_number=${ISSUE_NUMBER}" >> $GITHUB_OUTPUT
 
-          # Read mentions from the .github/qa-members.txt file
-          MENTIONS=$(cat .github/qa-members.txt | xargs)
+      - name: Notify QA Members from qa_members.txt
+        if: env.PRS != ''
+        run: |
+          if [ ! -f .github/qa_members.txt ]; then
+            echo "No QA member file found."
+            exit 1
+          fi
 
-          COMMENT_BODY="${MENTIONS} This PR merge to beta requires QA testing. Please review the changes listed in this issue."
+          MENTION_LIST=$(sed 's/^/@/' .github/qa_members.txt | paste -sd ' ' -)
+          MESSAGE="${MENTION_LIST} This PR merge to beta-release requires QA testing. Please review the listed changes."
 
-          echo "Notifying QA team: ${MENTIONS}"
-          gh issue comment "$ISSUE_NUMBER" --body "$COMMENT_BODY" -R ${{ github.repository }}
+          echo "Commenting with QA message: $MESSAGE"
+          gh issue comment "${{ env.ISSUE_NUMBER }}" --body "${MESSAGE}" -R ${{ github.repository }}
 
-          gh issue edit "$ISSUE_NUMBER" --add-label "needs-qa" -R ${{ github.repository }}
+      - name: Add needs-qa label to the issue
+        if: env.ISSUE_NUMBER != ''
+        run: |
+          gh issue edit "${{ env.ISSUE_NUMBER }}" --add-label "needs-qa" -R ${{ github.repository }}
