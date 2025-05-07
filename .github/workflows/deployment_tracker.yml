@@ -1,11 +1,11 @@
-name: Track Merges into beta-release (Linked PR Titles)
+name: Track Merges into beta (Linked PR Titles)
 
 on:
   pull_request:
     types:
       - closed
     branches:
-      - beta-release
+      - beta
   workflow_dispatch:
 
 permissions:
@@ -30,11 +30,11 @@ jobs:
           if [ -d "${{ github.workspace }}/.git" ]; then echo ".git directory FOUND."; else echo ".git directory NOT FOUND."; fi
           echo "--- End Verification ---"
 
-      - name: Get merged PRs into beta-release and format as Markdown links
+      - name: Get merged PRs into beta and format as Markdown links
         id: get_prs
         run: |
           echo "Attempting gh pr list command..."
-          RAW_PRS=$(gh pr list --base beta-release --state merged --json title,url -L 100 -R ${{ github.repository }})
+          RAW_PRS=$(gh pr list --base beta --state merged --json title,url -L 100 -R ${{ github.repository }})
           FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "[\(.title)](\(.url))"')
 
           if [ -z "$FORMATTED_PRS" ]; then
@@ -53,7 +53,7 @@ jobs:
         if: env.PRS != ''
         id: create_issue
         run: |
-          ISSUE_TITLE="PRs Merged into beta-release"
+          ISSUE_TITLE="PRs Merged into beta"
           ISSUE_BODY=$(printf "Merged PRs:\n\n%s" "${PRS}")
 
           echo "Creating issue with title: $ISSUE_TITLE"
@@ -80,7 +80,7 @@ jobs:
           fi
 
           MENTION_LIST=$(sed 's/^/@/' .github/qa_members.txt | paste -sd ' ' -)
-          MESSAGE="${MENTION_LIST} This PR merge to beta-release requires QA testing. Please review the listed changes."
+          MESSAGE="${MENTION_LIST} This PR merge to beta requires QA testing. Please review the listed changes."
 
           echo "Commenting with QA message: $MESSAGE"
           gh issue comment "${{ env.ISSUE_NUMBER }}" --body "${MESSAGE}" -R ${{ github.repository }}
