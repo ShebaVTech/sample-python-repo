@@ -1,24 +1,21 @@
-name: Notify QAs of Merged PRs to Beta
+name: Track Merges into Beta (Linked PR Titles)
 
 on:
   pull_request:
-    types: [closed]
+    types:
+      - closed
     branches:
       - beta
+  workflow_dispatch:
 
 permissions:
   issues: write
   pull-requests: read
 
 jobs:
-  notify_qas:
-    # Only if the PR is merged, and base is beta, head is main
-    if: |
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'beta' &&
-      github.event.pull_request.head.ref == 'main'
+  track_prs:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -26,49 +23,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set current date
+      - name: Load current date
+        id: date
         run: echo "today=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Load QA members from file
+      - name: Get merged PRs into beta
+        id: get_prs
         run: |
-          FILE=".github/workflows/qa_members.txt"
-          if [ ! -f "$FILE" ]; then
-            echo "QA members file not found: $FILE"
-            exit 1
-          fi
-          QAS=$(grep -v '^#' "$FILE" | tr '\n' ' ')
-          echo "MENTIONS=${QAS}" >> $GITHUB_ENV
+          RAW_PRS=$(gh pr list --base beta --state merged --json title -L 100 -R ${{ github.repository }})
+          FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r '.[] | "  - \(.title)"')
 
-      - name: Get PRs merged today into beta
-        run: |
-          TODAY=$(date +%Y-%m-%d)
-          RAW_PRS=$(gh pr list --base beta --state merged --json number,title,mergedAt -L 100 -R "${{ github.repository }}")
-
-          PRS=$(echo "$RAW_PRS" | jq -r --arg TODAY "$TODAY" '
-            map(select(.mergedAt | startswith($TODAY))) |
-            .[] | "- PR-\(.number) \(.title)"
-          ')
-
-          if [ -z "$PRS" ]; then
-            echo "No PRs merged into beta today."
+          if [ -z "$FORMATTED_PRS" ]; then
             echo "PRS=" >> $GITHUB_ENV
           else
             echo "PRS<<EOF" >> $GITHUB_ENV
-            echo "$PRS" >> $GITHUB_ENV
+            echo "$FORMATTED_PRS" >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
           fi
 
-      - name: Create QA Issue
+      - name: Load QA member usernames
+        id: load_qa
+        run: |
+          FILE=".github/workflows/qa_members.txt"
+          if [ ! -f "$FILE" ]; then
+            echo "QA member list not found: $FILE"
+            echo "MENTIONS=" >> $GITHUB_ENV
+          else
+            MENTIONS=$(grep -v '^#' "$FILE" | sed '/^$/d' | sed 's/^/@/' | paste -sd ' ' -)
+            echo "MENTIONS=$MENTIONS" >> $GITHUB_ENV
+          fi
+
+      - name: Create GitHub Issue for QA
         if: env.PRS != ''
         run: |
           TITLE="PRs Merged into Beta - ${today}"
+          BODY=$(printf "The following PRs have been merged into **beta**:\n\n%s\n\nPlease begin QA testing on the listed PRs." "${MENTIONS}\n\n${PRS}")
 
-          cat <<EOF > issue_body.md
-${MENTIONS} Please begin QA testing on the listed PRs.
-
-The following PRs have been merged into beta:
-
-${PRS}
-EOF
-
-          gh issue create --title "$TITLE" --body-file issue_body.md -R "${{ github.repository }}"
+          printf "%s" "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}

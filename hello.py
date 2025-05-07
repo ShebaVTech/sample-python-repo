@@ -1,3 +1,3 @@
-print('Losing Pat')
+print('Losing Pati')
 
 
