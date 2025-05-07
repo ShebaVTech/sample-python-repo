@@ -57,6 +57,6 @@ jobs:
         if: env.PRS != ''
         run: |
           TITLE="PRs Merged into Beta - ${today}"
-          BODY=$(printf "The following PRs have been merged into **beta**:\n\n%s\n\nPlease begin QA testing on the listed PRs." "${MENTIONS}\n\n${PRS}")
+          BODY=$(printf "Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n\n%s\n\n" "${MENTIONS}\n\n${PRS}")
 
           printf "%s" "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}
