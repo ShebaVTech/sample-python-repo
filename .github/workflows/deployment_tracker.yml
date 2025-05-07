@@ -32,6 +32,8 @@ jobs:
         run: |
           REPO="${{ github.repository }}"
           RAW_PRS=$(gh pr list --base beta --state merged --json number,title -L 100 -R "$REPO")
+          
+          # Format PRs properly and make sure PR titles and numbers are properly linked
           FORMATTED_PRS=$(echo "$RAW_PRS" | jq -r --arg REPO "$REPO" '.[] | "  - [PR-\(.number) \(.title)](https://github.com/\($REPO)/pull/\(.number))"')
 
           if [ -z "$FORMATTED_PRS" ]; then
@@ -58,14 +60,9 @@ jobs:
         if: env.PRS != ''
         run: |
           TITLE="PRs Merged into Beta - ${today}"
-          {
-            echo "${MENTIONS} Please begin QA testing on the listed PRs."
-            echo
-            echo "The following PRs have been merged into **beta** on ${today}:"
-            echo
-            echo "${PRS}"
-          } > issue_body.md
+          
+          # Create message body with date, mentions, and PR list
+          BODY="${MENTIONS} Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta** on ${today}:\n${PRS}"
 
-          cat issue_body.md
-
-          gh issue create --title "$TITLE" --body-file issue_body.md -R ${{ github.repository }}
+          # Create the GitHub issue
+          echo "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}
