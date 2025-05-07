@@ -1,3 +1,3 @@
-print('notify qas)
+print('notify qas updated)
 
 
