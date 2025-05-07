@@ -1,3 +1,3 @@
-print('wrong file name')
+print('wrong file path')
 
 
