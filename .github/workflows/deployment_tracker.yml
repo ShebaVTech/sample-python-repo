@@ -57,11 +57,7 @@ jobs:
         if: env.PRS != ''
         run: |
           TITLE="PRs Merged into Beta - ${today}"
+          BODY=$(printf "%s Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n\n%s" "$MENTIONS" "$PRS")
 
-          # Construct the message body
-          BODY="Please begin QA testing on the listed PRs.\n\nThe following PRs have been merged into **beta**:\n${PRS}\n\n${MENTIONS} Please begin QA testing on the listed PRs."
-
-          echo "$BODY"
-
-          # Create the GitHub issue with the formatted body
-          echo "$BODY" | gh issue create --title "$TITLE" --body-file - -R ${{ github.repository }}
+          echo "$BODY" > issue_body.md
+          gh issue create --title "$TITLE" --body-file issue_body.md -R ${{ github.repository }}
